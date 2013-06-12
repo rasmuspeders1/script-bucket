@@ -47,7 +47,7 @@ import re
 import sys
 
 # arscons version
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 env = Environment()
 platform = env['PLATFORM']
@@ -407,19 +407,23 @@ envArduino.Hex(TARGET + '.hex', TARGET + '.elf')
 envArduino.BuildInfo(None, TARGET + '.hex')
 
 # Reset
-def pulseDTR(target, source, env):
+def pulseDTRRTS(target, source, env):
     import serial
     import time
     ser = serial.Serial(ARDUINO_PORT)
     ser.setDTR(1)
-    time.sleep(0.5)
+    ser.setRTS(1)
+    time.sleep(0.25)
     ser.setDTR(0)
+    ser.setRTS(0)
+    time.sleep(0.05)
     ser.close()
+
 
 if RST_TRIGGER:
     reset_cmd = '%s %s' % (RST_TRIGGER, ARDUINO_PORT)
 else:
-    reset_cmd = pulseDTR
+    reset_cmd = pulseDTRRTS
 
 # Upload
 UPLOAD_PROTOCOL = getBoardConf('upload.protocol')
@@ -429,7 +433,7 @@ if UPLOAD_PROTOCOL == 'stk500':
     UPLOAD_PROTOCOL = 'stk500v1'
 
 
-avrdudeOpts = ['-V', '-F', '-c %s' % UPLOAD_PROTOCOL, '-b %s' % UPLOAD_SPEED,
+avrdudeOpts = ['-v', '-V', '-F', '-c %s' % UPLOAD_PROTOCOL, '-b %s' % UPLOAD_SPEED,
                '-p %s' % MCU, '-P %s' % ARDUINO_PORT, '-U flash:w:$SOURCES']
 if AVRDUDE_CONF:
     avrdudeOpts.append('-C %s' % AVRDUDE_CONF)
@@ -437,7 +441,7 @@ if AVRDUDE_CONF:
 fuse_cmd = '%s %s' % (path.join(path.dirname(AVR_HOME_DUDE), 'avrdude'),
                       ' '.join(avrdudeOpts))
 
-upload = envArduino.Alias('upload', TARGET + '.hex', [reset_cmd, fuse_cmd])
+upload = envArduino.Alias('upload', TARGET + '.hex', [ reset_cmd, fuse_cmd])
 AlwaysBuild(upload)
 
 # Clean build directory
