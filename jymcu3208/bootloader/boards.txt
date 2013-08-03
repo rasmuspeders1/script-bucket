@@ -1,0 +1,20 @@
+############################################################################
+#Board entry for the arduino boards file arduino/hardware/arduino/boards.txt
+
+atmega8led.name=ATmega8 LED Matrix Board
+
+atmega8led.upload.protocol=arduino
+atmega8led.upload.maximum_size=7168
+atmega8led.upload.speed=19200
+
+atmega8led.bootloader.low_fuses=0xe4
+atmega8led.bootloader.high_fuses=0xc8
+atmega8led.bootloader.path=atmega8
+atmega8led.bootloader.file=ATmegaBOOT.hex
+atmega8led.bootloader.unlock_bits=0x3F
+atmega8led.bootloader.lock_bits=0x0F
+
+atmega8led.build.mcu=atmega8
+atmega8led.build.f_cpu=8000000L
+atmega8led.build.core=arduino
+atmega8led.build.variant=standard 
