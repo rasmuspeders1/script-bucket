@@ -68,16 +68,18 @@ volatile uint8_t TCCR2_Backup;
 #define HTwrite      0b1010000000   // 101-aaaaaaa-dddd-dddd-dddd-dddd-dddd-... aaaaaaa:nibble adress 0..3F   (5F for 24*16)
 static inline void timersetup()
 {
-  //Timer 0 setup
-  //This interrupt should happen at 8000000/256/256 = 122.0703125 Hz
-  TCCR0 |= (1 << CS02); // Set timer0 prescaler to 256
-  TIMSK |= (1 << TOIE0); // enable timer0 overflow interrupt
-
+  cli();
   //Timer 2 setup
   //This overflow interrupt should happen at 32768Hz/256/128 = 1 Hz
   ASSR |= (1 << AS2); // Set timer2 to use external 32768Hz clock
+  TCCR2 &= 0b11111000; //Clear prescaler bits in TCCR2
   TCCR2 |= (1 << CS20) | (1 << CS21); // Set timer2 prescaler to 32
   TIMSK |= (1 << TOIE2); // enable timer0 overflow interrupt
+
+  // prescaler of 32 sets frequencey to 32768/32=1024
+  // Interrupt happens when 8 bit timer overflows (each 256'th count) 
+  // Interrupt will fire 1024/256 = 4 times each second
+  // Change prescaler to change interrupt frequency
 
   sei();
   //enable interrupts
@@ -92,15 +94,18 @@ static inline void HTsetup()
   HTbrightness(15);
   HTcommand(HTblinkoff);
 }
-
+/******************************************************************************
+ * Initialze randomizer with seed from eeprom
+ * save random number in eeprom for later use. 
+ * This way the random generator will be seeded differently each time.
+ *****************************************************************************/
 void initrand()
 {
-  uint32_t state;
-
-  state = EEPROM.read(0);
-
-  srandom(state);
-  EEPROM.write(0,state);
+  uint8_t seed;
+  seed = EEPROM.read(0);                //Reed seed from EEPROM
+  srandom(seed);                        //Seed the random generator
+  seed = random() / (RAND_MAX / (256)); //generate new random seed
+  EEPROM.write(0,seed);                 //Save this seed for next time.
 }
 
 void HTsend(uint16_t data, uint8_t n)
@@ -300,85 +305,86 @@ void ResetGameOfLife()
     TCCR2 = ((TCCR2 & 0b11111000) | 4);
   }
 }
-//~ // Timer 0 overflow interrupt routine.
-//~ ISR(TIMER0_OVF_vect)
-//~ {
-//~ 
-  //~ static uint8_t key1_down = 0;
-  //~ static uint8_t key2_down = 0;
-  //~ static uint8_t key3_down = 0;
-//~ 
-  //~ static uint8_t brightness = 0;
-  //~ static uint8_t brightness_levels[4] =
-    //~ { 0, 3, 7, 15 }; //brightness levels
-//~ 
-  //~ static uint8_t update_prescaler = 1;
-  //~ static uint8_t update_prescalers[6] =
-    //~ { 2, 3, 4, 5, 6, 7 };
-//~ 
-  //~ //Poll keys
-  //~ switch(key1 + (key2 << 1) + (key3 << 2))
-  //~ {
-    //~ case 1: //Key 1 is pressed
-    //~ {
-      //~ if(!key1_down)
-      //~ {
-        //~ key1_down = 1;
-//~ 
-        //~ ResetGameOfLife();
-//~ 
-      //~ }
-      //~ break;
-    //~ }
-    //~ case 2: //key 2 is pressed
-    //~ {
-      //~ if(!key2_down)
-      //~ {
-        //~ key2_down = 1;
-        //~ if(!interim_blinks_left)
-        //~ {
-          //~ TCCR2 = ((TCCR2 & 0b11111000)
-              //~ | update_prescalers[update_prescaler++ % 6]);
-        //~ }
-      //~ }
-      //~ break;
-    //~ }
-    //~ case 4: //key 3 is pressed
-    //~ {
-      //~ if(!key3_down)
-      //~ {
-        //~ key3_down = 1;
-        //~ HTbrightness(brightness_levels[brightness++ % 4]);
-      //~ }
-      //~ break;
-    //~ }
-  //~ }
-//~ 
-  //~ //If keys are not pressed right now, clear the key_down flags
-  //~ if(!key1) key1_down = 0;
-  //~ if(!key2) key2_down = 0;
-  //~ if(!key3) key3_down = 0;
-//~ 
-  //~ //Update LED array with led values
-  //~ HTsendscreen();
-//~ }
 
-//~ // Timer 2 overflow interrupt routine.
-//~ ISR(TIMER2_OVF_vect)
-//~ {
-  //~ UpdateLife();
-//~ }
+// Timer 2 overflow interrupt routine.
+ISR(TIMER2_OVF_vect)
+{
+  UpdateLife();
+}
+
+void check_keys_and_update()
+{
+    static uint8_t key1_down = 0;
+  static uint8_t key2_down = 0;
+  static uint8_t key3_down = 0;
+
+  static uint8_t brightness = 0;
+  static uint8_t brightness_levels[4] =
+    { 0, 3, 7, 15 }; //brightness levels
+
+  static uint8_t update_prescaler = 1;
+  static uint8_t update_prescalers[6] =
+    { 2, 3, 4, 5, 6, 7 };
+  
+
+
+  //Poll keys
+  switch(key1 + (key2 << 1) + (key3 << 2))
+  {
+    case 1: //Key 1 is pressed
+    {
+      if(!key1_down)
+      {
+        key1_down = 1;
+
+        ResetGameOfLife();
+
+      }
+      break;
+    }
+    case 2: //key 2 is pressed
+    {
+      if(!key2_down)
+      {
+        key2_down = 1;
+        if(!interim_blinks_left)
+        {
+          TCCR2 = ((TCCR2 & 0b11111000)
+              | update_prescalers[update_prescaler++ % 6]);
+        }
+      }
+      break;
+    }
+    case 4: //key 3 is pressed
+    {
+      if(!key3_down)
+      {
+        key3_down = 1;
+        HTbrightness(brightness_levels[brightness++ % 4]);
+      }
+      break;
+    }
+  }
+
+  //If keys are not pressed right now, clear the key_down flags
+  if(!key1) key1_down = 0;
+  if(!key2) key2_down = 0;
+  if(!key3) key3_down = 0;
+
+  //Update LED array with led values
+  HTsendscreen();
+}
 
 // the setup routine runs once when you press reset:
 void setup() {                
   HTpinsetup(); //Setup pins for controlling the HT1632
   HTsetup(); //Setup the initial configuration commands to HT1632
+  keysetup(); //Setup pins for keys
+  timersetup();
   initrand(); //Get random seed from EERPROM. New one is saved in EEPROM for next power cycle.   
 }
 
 // the loop routine runs over and over again forever:
 void loop() {
-  delay(1000);
-  UpdateLife();
-  HTsendscreen();
+  check_keys_and_update();
 }
