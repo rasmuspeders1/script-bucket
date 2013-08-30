@@ -20,13 +20,11 @@ float temperature;
 void draw()
 {
   u8g.setPrintPos(0, 0);
-  u8g.print("Temperature: ");
   u8g.print(temperature,1);
   u8g.print((char) 176);
   u8g.print("C");
   
-  u8g.setPrintPos(0, 8);
-  u8g.print("Humidity:    ");
+  u8g.setPrintPos(0, 30);
   u8g.print(humidity,1);
   u8g.print("%");
 
@@ -43,7 +41,7 @@ void setup()   {
   digitalWrite(7, 1);
   digitalWrite(8, 0);
   
-  u8g.setFont(u8g_font_6x12);
+  u8g.setFont(u8g_font_helvB24r);
   u8g.setFontRefHeightExtendedText();
   u8g.setDefaultForegroundColor();
   u8g.setFontPosTop();
